@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de Nota HTML - Final</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; max-width: 1000px; margin: auto; }
+    label, input, select, button, textarea { margin-top: 0.5rem; display: block; }
+    .variedad-item { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap; }
+    .variedad-item input { padding:0.25rem; width:150px; }
+    .remove-btn { background-color:red; color:white; border:none; padding:0.25rem 0.5rem; border-radius:4px; cursor:pointer; }
+    .remove-btn:hover { background-color:darkred; }
+    #preview { margin-top:2rem; padding:1rem; border:1px solid #ccc; background:#f9f9f9; }
+    .modal { display:none; position:fixed; z-index:1; left:0; top:0; width:100%; height:100%; overflow:auto; background-color: rgba(0,0,0,0.4); }
+    .modal-content { background:#fff; margin:5% auto; padding:20px; border:1px solid #888; width:80%; max-width:900px; }
+    .close { color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer; }
+    .close:hover { color:black; }
+    #htmlContent { width:100%; height:400px; font-family:monospace; }
+    .button-group { margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap; }
+    #pasteBox { width:100%; height:120px; margin-top:1rem; font-family:monospace; }
+    .small-note { font-size:12px; color:#444; margin-top:4px; }
+    .years-group { margin-top:1rem; margin-bottom:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+
+  <h2>Generador de Nota HTML</h2>
+
+  <label for="tramite">Seleccione el trámite:</label>
+  <select id="tramite">
+    <option value="a la Anualidad Cultivares Inscriptos en el RNPC (A1)(3)">Anualidad en RNPC</option>
+    <option value="al Estudio de Diferenciacion (A2)">Estudio de Diferenciacion</option>
+    <option value="a la Solicitud de inscripción en RNPC (A2)(1) ">Solicitud de inscripción en RNPC</option>
+    <option value="a la Solicitud de inscripción en RNC (A2)">Solicitud de inscripción en RNC</option>
+    <option value="a la Solicitud de inscripción en RNC y Estudio de Diferenciacion (A2)(2)">Solicitud de inscripción en RNC y Estudio de Diferenciacion</option>
+  </select>
+
+  <h3>Variedades</h3>
+  <div id="variedades"></div>
+  <button type="button" onclick="agregarVariedad()">Agregar Variedad</button>
+
+  <h4>Pegar listado de variedades (carga masiva)</h4>
+  <textarea id="pasteBox" placeholder="Ejemplo:
+,   SAE257467,   Soja
+,   SAC258257,   Soja"></textarea>
+  <button type="button" onclick="cargarDesdeTexto()">Cargar variedades desde texto</button>
+
+  <div id="anualidad-options" style="display:none;">
+    <h4>Años a considerar</h4>
+    <div class="years-group">
+      <label><input type="checkbox" class="year-checkbox" value="2019"> 2019</label>
+      <label><input type="checkbox" class="year-checkbox" value="2020"> 2020</label>
+      <label><input type="checkbox" class="year-checkbox" value="2021"> 2021</label>
+      <label><input type="checkbox" class="year-checkbox" value="2022"> 2022</label>
+      <label><input type="checkbox" class="year-checkbox" value="2023"> 2023</label>
+      <label><input type="checkbox" class="year-checkbox" value="2024"> 2024</label>
+    </div>
+
+    <label>
+      <input type="checkbox" id="aplicarIntereses"> Aplicar intereses (50% por variedad)
+    </label>
+  </div>
+
+  <div class="button-group">
+    <button onclick="mostrarPreview()">Previsualizar</button>
+    <button onclick="mostrarHTML()">Previsualizar HTML</button>
+    <button onclick="generarArchivo()">Generar archivo TXT</button>
+  </div>
+
+  <div id="preview"></div>
+
+  <!-- Modal para HTML -->
+  <div id="htmlModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="cerrarModal()">&times;</span>
+      <h3>Código HTML para copiar</h3>
+      <textarea id="htmlContent" readonly></textarea>
+      <div style="margin-top:8px;">
+        <button onclick="copiarHTML()">Copiar HTML</button>
+        <button onclick="abrirEnNuevaVentana()">Abrir en nueva ventana (fallback)</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const valoresArancel = {
+  "a la Anualidad Cultivares Inscriptos en el RNPC (A1)(3)": 189210,
+  "al Estudio de Diferenciacion (A2)": 235620,
+  "a la Solicitud de inscripción en RNPC (A2)(1) ": 471240,
+  "a la Solicitud de inscripción en RNC (A2)": 235620,
+  "a la Solicitud de inscripción en RNC y Estudio de Diferenciacion (A2)(2)": 471240
+};
+
+let variedades = [];
+
+const tramiteSelect = document.getElementById("tramite");
+const anualidadOptions = document.getElementById("anualidad-options");
+const aplicarInteresesCheckbox = document.getElementById("aplicarIntereses");
+const yearCheckboxes = document.querySelectorAll(".year-checkbox");
+
+function actualizarOpcionesAnualidad() {
+  const esAnualidad = tramiteSelect.value.toLowerCase().includes("anualidad");
+  anualidadOptions.style.display = esAnualidad ? "block" : "none";
+  aplicarInteresesCheckbox.checked = false;
+  yearCheckboxes.forEach(cb => cb.checked = false);
+}
+tramiteSelect.addEventListener("change", actualizarOpcionesAnualidad);
+actualizarOpcionesAnualidad();
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function agregarVariedad(numero = "", denominacion = "", especie = "") {
+  const index = Date.now() + Math.floor(Math.random() * 1000);
+  const contenedor = document.createElement("div");
+  contenedor.className = "variedad-item";
+  contenedor.id = `variedad_${index}`;
+
+  const inputN = document.createElement("input");
+  inputN.type = "text"; inputN.id = `numero_${index}`; inputN.value = numero; inputN.placeholder="Nro";
+
+  const inputD = document.createElement("input");
+  inputD.type = "text"; inputD.id = `denominacion_${index}`; inputD.value = denominacion; inputD.placeholder="Denominación";
+
+  const inputE = document.createElement("input");
+  inputE.type = "text"; inputE.id = `especie_${index}`; inputE.value = especie; inputE.placeholder="Especie";
+
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "remove-btn"; btn.textContent = "Eliminar";
+  btn.onclick = () => eliminarVariedad(index);
+
+  contenedor.appendChild(inputN);
+  contenedor.appendChild(inputD);
+  contenedor.appendChild(inputE);
+  contenedor.appendChild(btn);
+
+  document.getElementById("variedades").appendChild(contenedor);
+  variedades.push(index);
+}
+
+function eliminarVariedad(index) {
+  const contenedor = document.getElementById(`variedad_${index}`);
+  if (contenedor) contenedor.remove();
+  variedades = variedades.filter(id => id !== index);
+}
+
+function cargarDesdeTexto() {
+  const textoRaw = document.getElementById("pasteBox").value;
+  if (!textoRaw || !textoRaw.trim()) return;
+  const lineas = textoRaw.split(/\r?\n/);
+  lineas.forEach(lineaRaw => {
+    if (!lineaRaw || !lineaRaw.trim()) return;
+    const partes = lineaRaw.split(",").map(p => p.trim());
+    if (partes.length >= 2) {
+      const numero = partes[0] === "" ? ">" : partes[0];
+      const denominacion = partes[1] || "";
+      const especie = partes[2] || "";
+      agregarVariedad(numero, denominacion, especie);
+    }
+  });
+  document.getElementById("pasteBox").value = "";
+}
+
+function construirContenido() {
+  let tramite = document.getElementById("tramite").value;
+  let arancel = valoresArancel[tramite] || 0;
+  let listaVariedadesHTML = "";
+  let cantidad = 0;
+
+  variedades.forEach(id => {
+    const numero = document.getElementById(`numero_${id}`).value.trim();
+    const denom = document.getElementById(`denominacion_${id}`).value.trim();
+    const especie = document.getElementById(`especie_${id}`).value.trim();
+    if (denom && especie) {
+      cantidad++;
+      listaVariedadesHTML += `<li>${escapeHtml(numero || ">")} - ${escapeHtml(denom)} (${escapeHtml(especie)})</li>`;
+    }
+  });
+
+  let totalBase = arancel * cantidad;
+  let esAnualidad = tramite.toLowerCase().includes("anualidad");
+  let aplicarIntereses = esAnualidad && aplicarInteresesCheckbox.checked;
+  let intereses = aplicarIntereses ? Math.round(arancel * 0.5 * cantidad) : 0;
+
+  // Detectar si se seleccionó al menos un año para cambiar leyenda
+  let anyYearChecked = Array.from(yearCheckboxes).some(cb => cb.checked);
+  if (anyYearChecked && esAnualidad) {
+    tramite = tramite.replace("(A1)(3)", "(A2)(3)");
+  }
+
+  let contenido = `<p style="text-align:justify">Me dirijo a usted a fin de comunicarle que, conforme a lo establecido por la Resolución Nº 1 del 18 de abril del 2024 de la Secretaria de Bioeconomia del Ministerio de Economía, <strong>debe hacer efectivo el pago del arancel correspondiente ${escapeHtml(tramite)}</strong> de las variedades que se detallan a continuación:</p>
+<p><strong>Variedades a pagar:</strong></p>
+<ul>${listaVariedadesHTML}</ul>
+`;
+
+  if (anyYearChecked) {
+    let totalGeneral = 0;
+    yearCheckboxes.forEach(cb => {
+      if (cb.checked) {
+        let totalAno = totalBase + intereses;
+        totalGeneral += totalAno;
+        contenido += `<p style="text-align:justify">Valor a pagar por año ${cb.value}: $ ${totalAno.toLocaleString("es-AR")}</p>`;
+      }
+    });
+    contenido += `<p style="text-align:justify"><strong>Total a pagar: $ ${totalGeneral.toLocaleString("es-AR")}</strong></p>`;
+  } else {
+    const totalConIntereses = totalBase + intereses;
+    contenido += `<p style="text-align:justify"><br />Total a pagar: $ ${totalBase.toLocaleString("es-AR")}</p>`;
+    if (intereses > 0) {
+      contenido += `<p style="text-align:justify">Recargo por intereses (50% por variedad): $ ${intereses.toLocaleString("es-AR")}</p>
+<p style="text-align:justify"><strong>Total con intereses: $ ${totalConIntereses.toLocaleString("es-AR")}</strong></p>`;
+    }
+  }
+
+  // Mantener resto de texto igual
+  contenido += `<p style="text-align:justify"><br />Valor unitario:<br /><strong>$ ${arancel.toLocaleString("es-AR")}</strong> (**)</p>
+<p>-----------------------------------------------<br />
+<p>Dicho importe podrá ser abonado a través de los siguientes medio de pago segun corresponda:<br />
+<strong> (A1)> </strong> Según lo establecido por la Res. INASE 68/2025...</p>`; 
+
+  // Bloque artículo 1 bis solo si NO es anualidad
+  if (!esAnualidad) {
+    contenido += `<p>Asimismo, se notifica la presente en los términos del artículo 1 bis inc. K de la Ley 19.549.</br>
+<span style="font-size:10px"><em>"ARTICULO 1° bis.- Son principios fundamentales del procedimiento administrativo...</em></span></p>`;
+  }
+
+  return contenido;
+}
+
+function mostrarPreview() {
+  document.getElementById("preview").innerHTML = construirContenido();
+}
+
+function mostrarHTML() {
+  const contenido = construirContenido();
+  const modal = document.getElementById("htmlModal");
+  document.getElementById("htmlContent").value = contenido;
+  modal.style.display = "block";
+}
+
+function cerrarModal() {
+  document.getElementById("htmlModal").style.display = "none";
+}
+
+// Copiado de HTML
+async function copiarHTML() {
+  const htmlContent = document.getElementById("htmlContent");
+  const texto = htmlContent ? htmlContent.value : "";
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(texto);
+      alert("HTML copiado al portapapeles ✅");
+      return;
+    }
+    if (htmlContent) {
+      htmlContent.select();
+      document.execCommand && document.execCommand("copy");
+      alert("HTML copiado al portapapeles ✅ (execCommand)");
+    }
+  } catch (err) { abrirEnNuevaVentanaConTexto(texto); }
+}
+
+function abrirEnNuevaVentanaConTexto(texto) {
+  const newWin = window.open("", "_blank");
+  newWin.document.write(`<textarea style="width:100%;height:90vh">${texto}</textarea>`);
+}
+
+function abrirEnNuevaVentana() {
+  abrirEnNuevaVentanaConTexto(document.getElementById("htmlContent").value);
+}
+
+function generarArchivo() {
+  const contenido = construirContenido();
+  const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
+  const enlace = document.createElement("a");
+  enlace.href = URL.createObjectURL(blob);
+  enlace.download = "nota_generada.txt";
+  enlace.click();
+}
+
+window.onclick = function(event) {
+  const modal = document.getElementById("htmlModal");
+  if (event.target == modal) modal.style.display = "none";
+}
+</script>
+
+</body>
+</html>
