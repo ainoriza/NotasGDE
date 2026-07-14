@@ -19,6 +19,9 @@
     .button-group { margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap; }
     #pasteBox { width:100%; height:120px; margin-top:1rem; font-family:monospace; }
     .small-note { font-size:12px; color:#444; margin-top:4px; }
+    #selectorAnios { border:1px solid #ddd; border-radius:6px; padding:0.75rem; background:#fafafa; }
+    #aniosContainer label { display:flex; align-items:center; gap:0.25rem; margin:0; font-weight:normal; }
+    #aniosContainer input[type="checkbox"] { margin:0; width:auto; }
   </style>
 </head>
 <body>
@@ -46,9 +49,14 @@
 
   <h4>Anualidades</h4>
   <label>
-    <input type="checkbox" id="aplicarIntereses" disabled> Aplicar intereses (50% por variedad)
+    <input type="checkbox" id="aplicarIntereses" disabled> Aplicar intereses (50% por año)
   </label>
   <div class="small-note">El checkbox se habilita sólo cuando seleccionás "Anualidad en RNPC".</div>
+
+  <div id="selectorAnios" style="display:none; margin-top:0.75rem;">
+    <p style="margin:0 0 0.5rem 0; font-weight:bold;">Seleccione los años a abonar (arancel + 50% de interés c/u):</p>
+    <div id="aniosContainer"></div>
+  </div>
 
   <div class="button-group">
     <button onclick="mostrarPreview()">Previsualizar</button>
@@ -81,17 +89,65 @@
       "a la Solicitud de inscripción en RNC y Estudio de Diferenciacion (A2)(2)": 471240
     };
 
+    const ANIO_MIN = 2019;
+    const ANIO_MAX = 2026;
+
     let variedades = [];
 
     // Checkbox habilitado solo para Anualidad (buscamos la palabra 'Anualidad')
     const tramiteSelect = document.getElementById("tramite");
     const aplicarInteresesCheckbox = document.getElementById("aplicarIntereses");
+    const selectorAniosDiv = document.getElementById("selectorAnios");
+
     function actualizarEstadoCheckbox() {
       const esAnualidad = tramiteSelect.value && tramiteSelect.value.toLowerCase().includes("anualidad");
       aplicarInteresesCheckbox.disabled = !esAnualidad;
       if (!esAnualidad) aplicarInteresesCheckbox.checked = false;
+      actualizarSelectorAnios();
     }
+
+    // Genera los checkboxes de años (2019-2026) una sola vez
+    function generarCheckboxAnios() {
+      const cont = document.getElementById("aniosContainer");
+      cont.innerHTML = "";
+      for (let y = ANIO_MIN; y <= ANIO_MAX; y++) {
+        const wrap = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.id = `anio_${y}`;
+        cb.value = String(y);
+        wrap.appendChild(cb);
+        wrap.appendChild(document.createTextNode(String(y)));
+        cont.appendChild(wrap);
+      }
+    }
+
+    // Muestra u oculta el selector de años según trámite + checkbox de intereses
+    function actualizarSelectorAnios() {
+      const esAnualidad = tramiteSelect.value && tramiteSelect.value.toLowerCase().includes("anualidad");
+      const mostrar = esAnualidad && aplicarInteresesCheckbox.checked;
+      selectorAniosDiv.style.display = mostrar ? "block" : "none";
+      if (!mostrar) {
+        // Limpiamos selección de años cuando el selector se oculta
+        for (let y = ANIO_MIN; y <= ANIO_MAX; y++) {
+          const cb = document.getElementById(`anio_${y}`);
+          if (cb) cb.checked = false;
+        }
+      }
+    }
+
+    function obtenerAniosSeleccionados() {
+      const anios = [];
+      for (let y = ANIO_MIN; y <= ANIO_MAX; y++) {
+        const cb = document.getElementById(`anio_${y}`);
+        if (cb && cb.checked) anios.push(y);
+      }
+      return anios;
+    }
+
     tramiteSelect.addEventListener("change", actualizarEstadoCheckbox);
+    aplicarInteresesCheckbox.addEventListener("change", actualizarSelectorAnios);
+    generarCheckboxAnios();
     actualizarEstadoCheckbox();
 
     function escapeHtml(str) {
@@ -211,11 +267,35 @@
         }
       });
 
-      const totalBase = arancel * cantidad;
       const esAnualidad = tramite && tramite.toLowerCase().includes("anualidad");
       const aplicarIntereses = esAnualidad && !aplicarInteresesCheckbox.disabled && aplicarInteresesCheckbox.checked;
-      const intereses = aplicarIntereses ? Math.round(arancel * 0.5 * cantidad) : 0;
-      const totalConIntereses = totalBase + intereses;
+      const aniosSeleccionados = aplicarIntereses ? obtenerAniosSeleccionados().sort((a, b) => a - b) : [];
+
+      let totalBase = 0;
+      let intereses = 0;
+      let totalConIntereses = 0;
+      let detalleAniosHTML = "";
+
+      if (aplicarIntereses && aniosSeleccionados.length > 0) {
+        // Por cada año seleccionado: arancel (por variedad x cantidad) + 50% de interés sobre ese monto
+        detalleAniosHTML += "<ul>";
+        aniosSeleccionados.forEach(anio => {
+          const baseAnio = arancel * cantidad;
+          const interesAnio = Math.round(baseAnio * 0.5);
+          const totalAnio = baseAnio + interesAnio;
+          totalBase += baseAnio;
+          intereses += interesAnio;
+          totalConIntereses += totalAnio;
+          detalleAniosHTML += `<li>Año ${anio}: Arancel $ ${baseAnio.toLocaleString("es-AR")} + Interés (50%) $ ${interesAnio.toLocaleString("es-AR")} = $ ${totalAnio.toLocaleString("es-AR")}</li>`;
+        });
+        detalleAniosHTML += "</ul>";
+      } else {
+        totalBase = arancel * cantidad;
+        totalConIntereses = totalBase;
+      }
+
+      // Etiqueta de medio de pago: cambia de (A1) a (A2) cuando se aplican intereses
+      const etiquetaPago = aplicarIntereses ? "(A2)" : "(A1)";
 
       // Texto original completo (con reemplazo condicional del artículo 1 bis)
       let contenido = `
@@ -224,16 +304,23 @@
 
 <p><strong>Variedades a pagar:</strong></p>
 <ul>${listaVariedadesHTML}</ul>
-
-<p style="text-align:justify"><br />
-Total a pagar: $ ${totalBase.toLocaleString("es-AR")}</p>
 `;
 
-      if (intereses > 0) {
+      if (aplicarIntereses && aniosSeleccionados.length > 0) {
         contenido += `
-<p style="text-align:justify">Recargo por intereses (50% por variedad): $ ${intereses.toLocaleString("es-AR")}</p>
+<p><strong>Años a abonar:</strong></p>
+${detalleAniosHTML}
+
+<p style="text-align:justify"><br />
+Subtotal arancel: $ ${totalBase.toLocaleString("es-AR")}<br />
+Subtotal intereses (50% por año): $ ${intereses.toLocaleString("es-AR")}</p>
 
 <p style="text-align:justify"><strong>Total con intereses: $ ${totalConIntereses.toLocaleString("es-AR")}</strong></p>
+`;
+      } else {
+        contenido += `
+<p style="text-align:justify"><br />
+Total a pagar: $ ${totalBase.toLocaleString("es-AR")}</p>
 `;
       }
 
@@ -245,7 +332,7 @@ Valor unitario:<br />
 
 <p>-----------------------------------------------<br />
 <p>Dicho importe podrá ser abonado a través de los siguientes medio de pago segun corresponda:<br />
-<strong> (A1)> </strong> Según lo establecido por la Res. INASE 68/2025 en su art. 3º se establece como obligatorio el pago de una anualidad al momento de la inscripción del cultivar en el Registro Nacional de la Propiedad de Cultivares (<strong>Utilizar (A2)</strong>), 
+<strong> ${etiquetaPago}> </strong> Según lo establecido por la Res. INASE 68/2025 en su art. 3º se establece como obligatorio el pago de una anualidad al momento de la inscripción del cultivar en el Registro Nacional de la Propiedad de Cultivares (<strong>Utilizar (A2)</strong>), 
 y en su art. 4º se establece como obligatorio para los titulares de los cultivares inscriptos en el Registro Nacional de la Propiedad de  Cultivares, el pago del arancel anual del mencionado Registro desde el <a href="https://gestion.inase.gob.ar/portalServicios/portal" target="_blank"><strong> "Portal de Servicios" - INASE </strong></a> <strong></strong>, a partir del año posterior a la inscripción del cultivar.
 <br />
 <span style="font-size:10px">** </span><span style="font-size:10px"> > > ( <a href="https://www.youtube.com/watch?v=tftAxThcfYo" target="_blank">VIDEO Instructivo</a> ) <<</span><br /><br />
