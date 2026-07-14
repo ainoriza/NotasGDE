@@ -1,3 +1,79 @@
+
+Claude terminó la respuesta
+
+<!DOCTYPE html> <html lang="es"> <head> <meta charset="UTF-8"> <title>Generador de Nota HTML - Final</title> <style> body { font-family: Arial, sans-serif; padding: 2rem; max-width: 1000px; margin: auto; } label, input, select, button, textarea { margin-top: 0.5rem; display: blo
+
+pasted
+
+Este es mi codigo actual, manten la extructura pero para el caso de elegir el tipo Anualidad en RNPC se debe habilitar un selector de años al selecionar el ceck de intereses, de los cuales debe ser del 2019 a 2026, se debe clickear en los check box de cada año.
+El calculo sera el año mas el 50% por cada año es decir se cobrara por cada año el arancel mas el intenteres de cada uno.
+
+Ademas en caso de click el boton intereses se cambiara el texto de (A1) a (A2)
+
+Pregunta de ser necesario.
+
+
+Architected dynamic year selector con cálculo de intereses por período
+Architected dynamic year selector con cálculo de intereses por período
+Voy a construir esto directamente sobre tu código, agregando el selector de años (2019-2026) que aparece solo cuando el trámite es "Anualidad en RNPC" y tildás "Aplicar intereses", y el cambio de etiqueta (A1)→(A2).
+
+Antes de tirarme de cabeza, mi interpretación del cálculo (decime si no es así):
+
+Por cada año que tildes, se cobra: arancel × cantidad de variedades (base del año) + 50% de interés sobre eso = arancel × cantidad × 1.5
+El total final es la suma de todos los años tildados
+Si no tildás ningún año (pero el check de intereses está activo), no se agrega nada extra
+El cambio de "(A1)" a "(A2)" en el texto se dispara con el check de intereses tildado (no depende de si hay años seleccionados)
+Voy a implementarlo así. Si el criterio de cálculo es otro, lo ajusto fácil.
+
+
+Creó un archivo, archivo leído
+Creó un archivo, archivo leído
+Qué agregué:
+
+Selector de años: aparece debajo del check "Aplicar intereses" solo cuando el trámite es Anualidad y el check está tildado. Genera checkboxes 2019-2026.
+Cálculo: por cada año tildado se cobra arancel×cantidad de variedades + 50% de interés sobre ese monto. El total final suma todos los años seleccionados, y la nota muestra el detalle año por año más los subtotales.
+(A1)→(A2): al tildar "Aplicar intereses" (con Anualidad seleccionada), el texto pasa de "(A1)>" a "(A2)>" en el párrafo de medios de pago.
+Si se destilda el check o cambiás de trámite, el selector se oculta y limpia los años marcados para que no queden años "fantasma" afectando un cálculo posterior.
+Una cosa a tener en cuenta: como el segundo bloque de pago ya dice "(A2)> eRecauda", cuando se activa el interés vas a tener dos etiquetas "(A2)" en el texto (una para el primer párrafo y otra para eRecauda). Lo dejé tal cual lo pediste literalmente, pero si en realidad querías que se oculte o reemplace el bloque de eRecauda en ese caso, decime y lo ajusto.
+
+
+Generador nota html
+Código · HTML 
+sobre lo de A1 a a2,
+Se debe cambiar en la parte de "debe hacer efectivo el pago del arancel correspondiente a la Anualidad Cultivares Inscriptos en el RNPC (A1)(3)"
+
+
+Recalibró estrategia para reemplazar A1 con A2 selectivamente
+Recalibró estrategia para reemplazar A1 con A2 selectivamente
+Ah, entendido — el cambio va en el texto del trámite mismo (el que se arma con la variable tramite, ej. "...RNPC (A1)(3)"), no en el párrafo de medios de pago. Corrijo:
+
+
+Editó 2 archivos
+Editó 2 archivos
+Listo, corregido. Ahora:
+
+El párrafo de medios de pago vuelve a mostrar siempre "(A1)>" fijo (como en tu original).
+El texto del trámite en el párrafo inicial — el que dice "...arancel correspondiente a la Anualidad Cultivares Inscriptos en el RNPC (A1)(3)" — pasa a mostrar "(A2)(3)" cuando el check de intereses está tildado.
+El valor usado internamente para buscar el arancel (valoresArancel[tramite]) no se toca, solo cambia el texto que se muestra en la nota.
+
+Presented file
+Presented file
+Fijate si al probarlo con el check tildado y algún año seleccionado el texto y el total te cierran bien.
+
+
+Generador nota html
+Código · HTML 
+
+¿Quieres recibir una notificación cuando Claude responda?
+
+
+
+
+
+Claude es IA y puede cometer errores. Por favor, verifica nuevamente las respuestas.
+
+
+Generador nota html · HTML
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -25,9 +101,9 @@
   </style>
 </head>
 <body>
-
+ 
   <h2>Generador de Nota HTML</h2>
-
+ 
   <label for="tramite">Seleccione el trámite:</label>
   <select id="tramite">
     <option value="a la Anualidad Cultivares Inscriptos en el RNPC (A1)(3)">Anualidad en RNPC</option>
@@ -36,36 +112,36 @@
     <option value="a la Solicitud de inscripción en RNC (A2)">Solicitud de inscripción en RNC</option>
     <option value="a la Solicitud de inscripción en RNC y Estudio de Diferenciacion (A2)(2)">Solicitud de inscripción en RNC y Estudio de Diferenciacion</option>
   </select>
-
+ 
   <h3>Variedades</h3>
   <div id="variedades"></div>
   <button type="button" onclick="agregarVariedad()">Agregar Variedad</button>
-
+ 
   <h4>Pegar listado de variedades (carga masiva)</h4>
   <textarea id="pasteBox" placeholder="Ejemplo:
 ,   SAE257467,   Soja
 ,   SAC258257,   Soja"></textarea>
   <button type="button" onclick="cargarDesdeTexto()">Cargar variedades desde texto</button>
-
+ 
   <h4>Anualidades</h4>
   <label>
     <input type="checkbox" id="aplicarIntereses" disabled> Aplicar intereses (50% por año)
   </label>
   <div class="small-note">El checkbox se habilita sólo cuando seleccionás "Anualidad en RNPC".</div>
-
+ 
   <div id="selectorAnios" style="display:none; margin-top:0.75rem;">
     <p style="margin:0 0 0.5rem 0; font-weight:bold;">Seleccione los años a abonar (arancel + 50% de interés c/u):</p>
     <div id="aniosContainer"></div>
   </div>
-
+ 
   <div class="button-group">
     <button onclick="mostrarPreview()">Previsualizar</button>
     <button onclick="mostrarHTML()">Previsualizar HTML</button>
     <button onclick="generarArchivo()">Generar archivo TXT</button>
   </div>
-
+ 
   <div id="preview"></div>
-
+ 
   <!-- Modal para HTML -->
   <div id="htmlModal" class="modal">
     <div class="modal-content">
@@ -78,7 +154,7 @@
       </div>
     </div>
   </div>
-
+ 
   <script>
     // Aranceles por trámite (valores unitarios)
     const valoresArancel = {
@@ -88,24 +164,24 @@
       "a la Solicitud de inscripción en RNC (A2)": 235620,
       "a la Solicitud de inscripción en RNC y Estudio de Diferenciacion (A2)(2)": 471240
     };
-
+ 
     const ANIO_MIN = 2019;
     const ANIO_MAX = 2026;
-
+ 
     let variedades = [];
-
+ 
     // Checkbox habilitado solo para Anualidad (buscamos la palabra 'Anualidad')
     const tramiteSelect = document.getElementById("tramite");
     const aplicarInteresesCheckbox = document.getElementById("aplicarIntereses");
     const selectorAniosDiv = document.getElementById("selectorAnios");
-
+ 
     function actualizarEstadoCheckbox() {
       const esAnualidad = tramiteSelect.value && tramiteSelect.value.toLowerCase().includes("anualidad");
       aplicarInteresesCheckbox.disabled = !esAnualidad;
       if (!esAnualidad) aplicarInteresesCheckbox.checked = false;
       actualizarSelectorAnios();
     }
-
+ 
     // Genera los checkboxes de años (2019-2026) una sola vez
     function generarCheckboxAnios() {
       const cont = document.getElementById("aniosContainer");
@@ -121,7 +197,7 @@
         cont.appendChild(wrap);
       }
     }
-
+ 
     // Muestra u oculta el selector de años según trámite + checkbox de intereses
     function actualizarSelectorAnios() {
       const esAnualidad = tramiteSelect.value && tramiteSelect.value.toLowerCase().includes("anualidad");
@@ -135,7 +211,7 @@
         }
       }
     }
-
+ 
     function obtenerAniosSeleccionados() {
       const anios = [];
       for (let y = ANIO_MIN; y <= ANIO_MAX; y++) {
@@ -144,12 +220,12 @@
       }
       return anios;
     }
-
+ 
     tramiteSelect.addEventListener("change", actualizarEstadoCheckbox);
     aplicarInteresesCheckbox.addEventListener("change", actualizarSelectorAnios);
     generarCheckboxAnios();
     actualizarEstadoCheckbox();
-
+ 
     function escapeHtml(str) {
       if (str === null || str === undefined) return "";
       return String(str)
@@ -159,13 +235,13 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
     }
-
+ 
     function agregarVariedad(numero = "", denominacion = "", especie = "") {
       const index = Date.now() + Math.floor(Math.random() * 1000);
       const contenedor = document.createElement("div");
       contenedor.className = "variedad-item";
       contenedor.id = `variedad_${index}`;
-
+ 
       const labelN = document.createElement("label");
       labelN.setAttribute("for", `numero_${index}`);
       labelN.textContent = "Nro:";
@@ -173,7 +249,7 @@
       inputN.type = "text";
       inputN.id = `numero_${index}`;
       inputN.value = numero;
-
+ 
       const labelD = document.createElement("label");
       labelD.setAttribute("for", `denominacion_${index}`);
       labelD.textContent = "Denominación:";
@@ -181,7 +257,7 @@
       inputD.type = "text";
       inputD.id = `denominacion_${index}`;
       inputD.value = denominacion;
-
+ 
       const labelE = document.createElement("label");
       labelE.setAttribute("for", `especie_${index}`);
       labelE.textContent = "Especie:";
@@ -189,13 +265,13 @@
       inputE.type = "text";
       inputE.id = `especie_${index}`;
       inputE.value = especie;
-
+ 
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "remove-btn";
       btn.textContent = "Eliminar";
       btn.onclick = () => eliminarVariedad(index);
-
+ 
       contenedor.appendChild(labelN);
       contenedor.appendChild(inputN);
       contenedor.appendChild(labelD);
@@ -203,29 +279,29 @@
       contenedor.appendChild(labelE);
       contenedor.appendChild(inputE);
       contenedor.appendChild(btn);
-
+ 
       document.getElementById("variedades").appendChild(contenedor);
       variedades.push(index);
     }
-
+ 
     function eliminarVariedad(index) {
       const contenedor = document.getElementById(`variedad_${index}`);
       if (contenedor) contenedor.remove();
       variedades = variedades.filter(id => id !== index);
     }
-
+ 
     // Cargar desde textarea masiva: solamente usamos '>' si el Nro está vacío.
     function cargarDesdeTexto() {
       const textoRaw = document.getElementById("pasteBox").value;
       if (!textoRaw || !textoRaw.trim()) return;
-
+ 
       const lineas = textoRaw.split(/\r?\n/);
       lineas.forEach(lineaRaw => {
         if (!lineaRaw || !lineaRaw.trim()) return;
         // Split por comas y mantener vacíos
         const partesRaw = lineaRaw.split(",");
         const partes = partesRaw.map(p => p.trim());
-
+ 
         // Si la primera parte está vacía -> Nº = ">", denominación = siguiente parte
         if (partes.length >= 2) {
           if (partes[0] === "") {
@@ -241,17 +317,17 @@
           }
         }
       });
-
+ 
       document.getElementById("pasteBox").value = "";
     }
-
+ 
     // Construye el contenido completo de la nota (manteniendo texto original)
     function construirContenido() {
       const tramite = document.getElementById("tramite").value;
       const arancel = valoresArancel[tramite] || 0;
       let listaVariedadesHTML = "";
       let cantidad = 0;
-
+ 
       variedades.forEach(id => {
         const numeroEl = document.getElementById(`numero_${id}`);
         const denomEl = document.getElementById(`denominacion_${id}`);
@@ -266,16 +342,16 @@
           listaVariedadesHTML += `<li>${escapeHtml(nroMostrar)} - ${escapeHtml(denom)} (${escapeHtml(especie)})</li>`;
         }
       });
-
+ 
       const esAnualidad = tramite && tramite.toLowerCase().includes("anualidad");
       const aplicarIntereses = esAnualidad && !aplicarInteresesCheckbox.disabled && aplicarInteresesCheckbox.checked;
       const aniosSeleccionados = aplicarIntereses ? obtenerAniosSeleccionados().sort((a, b) => a - b) : [];
-
+ 
       let totalBase = 0;
       let intereses = 0;
       let totalConIntereses = 0;
       let detalleAniosHTML = "";
-
+ 
       if (aplicarIntereses && aniosSeleccionados.length > 0) {
         // Por cada año seleccionado: arancel (por variedad x cantidad) + 50% de interés sobre ese monto
         detalleAniosHTML += "<ul>";
@@ -293,28 +369,28 @@
         totalBase = arancel * cantidad;
         totalConIntereses = totalBase;
       }
-
-      // Etiqueta de medio de pago: cambia de (A1) a (A2) cuando se aplican intereses
-      const etiquetaPago = aplicarIntereses ? "(A2)" : "(A1)";
-
+ 
+      // Si se aplican intereses, el trámite mostrado en el texto pasa de (A1) a (A2)
+      const tramiteMostrado = aplicarIntereses ? tramite.replace("(A1)", "(A2)") : tramite;
+ 
       // Texto original completo (con reemplazo condicional del artículo 1 bis)
       let contenido = `
 <p style="text-align:justify">Me dirijo a usted a fin de comunicarle que, conforme a lo establecido por la Resolución Nº 1 del 18 de abril del 2024 de la Secretaria de Bioeconomia del Ministerio de Economía, <strong>
-    debe hacer efectivo el pago del arancel correspondiente ${escapeHtml(tramite)} </strong>de las variedades que se detallan a continuación:</p>
-
+    debe hacer efectivo el pago del arancel correspondiente ${escapeHtml(tramiteMostrado)} </strong>de las variedades que se detallan a continuación:</p>
+ 
 <p><strong>Variedades a pagar:</strong></p>
 <ul>${listaVariedadesHTML}</ul>
 `;
-
+ 
       if (aplicarIntereses && aniosSeleccionados.length > 0) {
         contenido += `
 <p><strong>Años a abonar:</strong></p>
 ${detalleAniosHTML}
-
+ 
 <p style="text-align:justify"><br />
 Subtotal arancel: $ ${totalBase.toLocaleString("es-AR")}<br />
 Subtotal intereses (50% por año): $ ${intereses.toLocaleString("es-AR")}</p>
-
+ 
 <p style="text-align:justify"><strong>Total con intereses: $ ${totalConIntereses.toLocaleString("es-AR")}</strong></p>
 `;
       } else {
@@ -323,24 +399,24 @@ Subtotal intereses (50% por año): $ ${intereses.toLocaleString("es-AR")}</p>
 Total a pagar: $ ${totalBase.toLocaleString("es-AR")}</p>
 `;
       }
-
+ 
       contenido += `
-
+ 
 <p style="text-align:justify"><br />
 Valor unitario:<br />
 <strong>$ ${arancel.toLocaleString("es-AR")}</strong> (**)</p>
-
+ 
 <p>-----------------------------------------------<br />
 <p>Dicho importe podrá ser abonado a través de los siguientes medio de pago segun corresponda:<br />
-<strong> ${etiquetaPago}> </strong> Según lo establecido por la Res. INASE 68/2025 en su art. 3º se establece como obligatorio el pago de una anualidad al momento de la inscripción del cultivar en el Registro Nacional de la Propiedad de Cultivares (<strong>Utilizar (A2)</strong>), 
+<strong> (A1)> </strong> Según lo establecido por la Res. INASE 68/2025 en su art. 3º se establece como obligatorio el pago de una anualidad al momento de la inscripción del cultivar en el Registro Nacional de la Propiedad de Cultivares (<strong>Utilizar (A2)</strong>), 
 y en su art. 4º se establece como obligatorio para los titulares de los cultivares inscriptos en el Registro Nacional de la Propiedad de  Cultivares, el pago del arancel anual del mencionado Registro desde el <a href="https://gestion.inase.gob.ar/portalServicios/portal" target="_blank"><strong> "Portal de Servicios" - INASE </strong></a> <strong></strong>, a partir del año posterior a la inscripción del cultivar.
 <br />
 <span style="font-size:10px">** </span><span style="font-size:10px"> > > ( <a href="https://www.youtube.com/watch?v=tftAxThcfYo" target="_blank">VIDEO Instructivo</a> ) <<</span><br /><br />
-
-
+ 
+ 
 <strong> (A2)> eRecauda</strong> * (<a href="https://erecauda.mecon.gov.ar/erecauda/" target="_blank">https://erecauda.mecon.gov.ar/erecauda/</a>) <strong> </strong><br />
 <span style="font-size:10px"></span><span style="font-size:10px"> >> ( <a href="https://dgsiaf-repo.mecon.gob.ar/repository/erecauda/uploads/TE_EREC_ERECAUDA_Guia_Usuario.pdf" target="_blank">Guía de Usuario</a> ) << </span><br /><br />
-
+ 
 >> Una vez realizada la misma deberá enviar el comprobante a través del Expediente en el cual fue notificado, ente la imposibilidad de realizar esta acción debera realizar una <a href="https://tramitesadistancia.gob.ar/tramitesadistancia/detalle-tipo?id=5173" target="_blank">Presentacion Ciudadana via TAD</a> de lo contrario el INASE se verá imposibilitado de generar el recibo y continuar la tramitación de las solicitudes respectivas.<br />
 <br /></p>
 <p style="text-align:justify"><span style="font-size:12px">(1) Una vez emitido el título, este podrá ser retirado en esta Dirección ya sea por el representante legal de la firma o por tercero autorizado mediante nota detallando su nombre completo y DNI.<br /></p>
@@ -352,7 +428,7 @@ el Art. 30 inc. e) de la Ley Nº 20247, de Semillas y Creaciones Fitogenéticas 
 <p style="text-align:justify"><span style="font-size:12px">(**) Los valores establecidos en la presente resolución deberán ser abonados previo a la prestación de los servicios o entrega de los bienes arancelados.</span>
 </p>
 `;
-
+ 
       // Si NO es Anualidad, agregamos el bloque del artículo 1 bis
       if (!esAnualidad) {
         contenido += `
@@ -361,15 +437,15 @@ el Art. 30 inc. e) de la Ley Nº 20247, de Semillas y Creaciones Fitogenéticas 
 Se exceptúan de la caducidad los trámites relativos a previsión social y los que la Administración considerare que deben continuar por sus particulares circunstancias o por estar comprometido el interés público. Operada la caducidad, el interesado podrá, no obstante, ejercer sus pretensiones en un nuevo expediente, en el que podrá hacer valer las pruebas ya producidas."<br />
 </em></span></p>`;
       }
-
+ 
       return contenido;
     }
-
+ 
     function mostrarPreview() {
       const contenido = construirContenido();
       document.getElementById("preview").innerHTML = contenido;
     }
-
+ 
     function mostrarHTML() {
       const contenido = construirContenido();
       const modal = document.getElementById("htmlModal");
@@ -377,23 +453,23 @@ Se exceptúan de la caducidad los trámites relativos a previsión social y los 
       htmlContent.value = contenido;
       modal.style.display = "block";
     }
-
+ 
     function cerrarModal() {
       document.getElementById("htmlModal").style.display = "none";
     }
-
+ 
     // Copiar HTML: navigator.clipboard -> execCommand -> abrir ventana nueva con textarea
     async function copiarHTML() {
       const htmlContent = document.getElementById("htmlContent");
       const texto = htmlContent ? htmlContent.value : "";
-
+ 
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(texto);
           alert("HTML copiado al portapapeles ✅");
           return;
         }
-
+ 
         if (htmlContent) {
           htmlContent.select();
           const ok = document.execCommand && document.execCommand("copy");
@@ -402,14 +478,14 @@ Se exceptúan de la caducidad los trámites relativos a previsión social y los 
             return;
           }
         }
-
+ 
         throw new Error("No se pudo copiar automáticamente");
       } catch (err) {
         console.warn("Copiar falló, usando fallback de ventana:", err);
         abrirEnNuevaVentanaConTexto(texto);
       }
     }
-
+ 
     // Fallback: abre nueva ventana con textarea y botón para copiar allí
     function abrirEnNuevaVentanaConTexto(texto) {
       const newWin = window.open("", "_blank");
@@ -417,7 +493,7 @@ Se exceptúan de la caducidad los trámites relativos a previsión social y los 
         alert("No se pudo abrir una nueva ventana. Usá 'Generar archivo TXT' o copiá manualmente desde el cuadro de HTML.");
         return;
       }
-
+ 
       function escapeHtmlSimple(s) {
         return String(s || "")
           .replace(/&/g, "&amp;")
@@ -426,9 +502,9 @@ Se exceptúan de la caducidad los trámites relativos a previsión social y los 
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
       }
-
+ 
       const safe = escapeHtmlSimple(texto);
-
+ 
       newWin.document.write(`
       <!doctype html>
       <html lang="es">
@@ -478,12 +554,12 @@ Se exceptúan de la caducidad los trámites relativos a previsión social y los 
       `);
       newWin.document.close();
     }
-
+ 
     function abrirEnNuevaVentana() {
       const htmlContent = document.getElementById("htmlContent");
       abrirEnNuevaVentanaConTexto(htmlContent ? htmlContent.value : "");
     }
-
+ 
     function generarArchivo() {
       const contenido = construirContenido();
       const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
@@ -492,7 +568,7 @@ Se exceptúan de la caducidad los trámites relativos a previsión social y los 
       enlace.download = "nota_generada.txt";
       enlace.click();
     }
-
+ 
     // Cerrar modal al hacer clic fuera del contenido
     window.onclick = function(event) {
       const modal = document.getElementById("htmlModal");
@@ -501,6 +577,7 @@ Se exceptúan de la caducidad los trámites relativos a previsión social y los 
       }
     }
   </script>
-
+ 
 </body>
 </html>
+ 
