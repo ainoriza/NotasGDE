@@ -1,0 +1,165 @@
+
+Claude terminó la respuesta
+
+<!DOCTYPE html> <html lang="es"> <head> <meta charset="UTF-8"> <title>Generador de Nota HTML - Final</title> <style> body { font-family: Arial, sans-serif; padding: 2rem; max-width: 1000px; margin: auto; } label, input, select, button, textarea { margin-top: 0.5rem; display: blo
+
+pasted
+
+Este es mi codigo actual, manten la extructura pero para el caso de elegir el tipo Anualidad en RNPC se debe habilitar un selector de años al selecionar el ceck de intereses, de los cuales debe ser del 2019 a 2026, se debe clickear en los check box de cada año.
+El calculo sera el año mas el 50% por cada año es decir se cobrara por cada año el arancel mas el intenteres de cada uno.
+
+Ademas en caso de click el boton intereses se cambiara el texto de (A1) a (A2)
+
+Pregunta de ser necesario.
+
+
+Architected dynamic year selector con cálculo de intereses por período
+Architected dynamic year selector con cálculo de intereses por período
+Voy a construir esto directamente sobre tu código, agregando el selector de años (2019-2026) que aparece solo cuando el trámite es "Anualidad en RNPC" y tildás "Aplicar intereses", y el cambio de etiqueta (A1)→(A2).
+
+Antes de tirarme de cabeza, mi interpretación del cálculo (decime si no es así):
+
+Por cada año que tildes, se cobra: arancel × cantidad de variedades (base del año) + 50% de interés sobre eso = arancel × cantidad × 1.5
+El total final es la suma de todos los años tildados
+Si no tildás ningún año (pero el check de intereses está activo), no se agrega nada extra
+El cambio de "(A1)" a "(A2)" en el texto se dispara con el check de intereses tildado (no depende de si hay años seleccionados)
+Voy a implementarlo así. Si el criterio de cálculo es otro, lo ajusto fácil.
+
+
+Creó un archivo, archivo leído
+Creó un archivo, archivo leído
+Qué agregué:
+
+Selector de años: aparece debajo del check "Aplicar intereses" solo cuando el trámite es Anualidad y el check está tildado. Genera checkboxes 2019-2026.
+Cálculo: por cada año tildado se cobra arancel×cantidad de variedades + 50% de interés sobre ese monto. El total final suma todos los años seleccionados, y la nota muestra el detalle año por año más los subtotales.
+(A1)→(A2): al tildar "Aplicar intereses" (con Anualidad seleccionada), el texto pasa de "(A1)>" a "(A2)>" en el párrafo de medios de pago.
+Si se destilda el check o cambiás de trámite, el selector se oculta y limpia los años marcados para que no queden años "fantasma" afectando un cálculo posterior.
+Una cosa a tener en cuenta: como el segundo bloque de pago ya dice "(A2)> eRecauda", cuando se activa el interés vas a tener dos etiquetas "(A2)" en el texto (una para el primer párrafo y otra para eRecauda). Lo dejé tal cual lo pediste literalmente, pero si en realidad querías que se oculte o reemplace el bloque de eRecauda en ese caso, decime y lo ajusto.
+
+
+Generador nota html
+Código · HTML 
+
+
+¿Quieres recibir una notificación cuando Claude responda?
+
+
+
+
+
+Claude es IA y puede cometer errores. Por favor, verifica nuevamente las respuestas.
+Contenido pegado
+20.16 KB •419 líneas
+•
+El formato puede ser inconsistente con la fuente
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de Nota HTML - Final</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; max-width: 1000px; margin: auto; }
+    label, input, select, button, textarea { margin-top: 0.5rem; display: block; }
+    .variedad-item { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap; }
+    .variedad-item input { padding:0.25rem; width:150px; }
+    .remove-btn { background-color:red; color:white; border:none; padding:0.25rem 0.5rem; border-radius:4px; cursor:pointer; }
+    .remove-btn:hover { background-color:darkred; }
+    #preview { margin-top:2rem; padding:1rem; border:1px solid #ccc; background:#f9f9f9; }
+    .modal { display:none; position:fixed; z-index:1; left:0; top:0; width:100%; height:100%; overflow:auto; background-color: rgba(0,0,0,0.4); }
+    .modal-content { background:#fff; margin:5% auto; padding:20px; border:1px solid #888; width:80%; max-width:900px; }
+    .close { color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer; }
+    .close:hover { color:black; }
+    #htmlContent { width:100%; height:400px; font-family:monospace; }
+    .button-group { margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap; }
+    #pasteBox { width:100%; height:120px; margin-top:1rem; font-family:monospace; }
+    .small-note { font-size:12px; color:#444; margin-top:4px; }
+  </style>
+</head>
+<body>
+
+  <h2>Generador de Nota HTML</h2>
+
+  <label for="tramite">Seleccione el trámite:</label>
+  <select id="tramite">
+    <option value="a la Anualidad Cultivares Inscriptos en el RNPC (A1)(3)">Anualidad en RNPC</option>
+    <option value="al Estudio de Diferenciacion (A2)">Estudio de Diferenciacion</option>
+    <option value="a la Inscripción de Cultivares en el Registro Nacional de la Propiedad de Cultivares (RNPC) (A2)(1) ">Inscripción de Cultivares en el Registro Nacional de la Propiedad de Cultivares (RNPC)</option>
+    <option value="a la Solicitud de inscripción en RNC (A2)">Solicitud de inscripción en RNC</option>
+    <option value="a la Solicitud de inscripción en RNC y Estudio de Diferenciacion (A2)(2)">Solicitud de inscripción en RNC y Estudio de Diferenciacion</option>
+  </select>
+
+  <h3>Variedades</h3>
+  <div id="variedades"></div>
+  <button type="button" onclick="agregarVariedad()">Agregar Variedad</button>
+
+  <h4>Pegar listado de variedades (carga masiva)</h4>
+  <textarea id="pasteBox" placeholder="Ejemplo:
+,   SAE257467,   Soja
+,   SAC258257,   Soja"></textarea>
+  <button type="button" onclick="cargarDesdeTexto()">Cargar variedades desde texto</button>
+
+  <h4>Anualidades</h4>
+  <label>
+    <input type="checkbox" id="aplicarIntereses" disabled> Aplicar intereses (50% por variedad)
+  </label>
+  <div class="small-note">El checkbox se habilita sólo cuando seleccionás "Anualidad en RNPC".</div>
+
+  <div class="button-group">
+    <button onclick="mostrarPreview()">Previsualizar</button>
+    <button onclick="mostrarHTML()">Previsualizar HTML</button>
+    <button onclick="generarArchivo()">Generar archivo TXT</button>
+  </div>
+
+  <div id="preview"></div>
+
+  <!-- Modal para HTML -->
+  <div id="htmlModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="cerrarModal()">&times;</span>
+      <h3>Código HTML para copiar</h3>
+      <textarea id="htmlContent" readonly></textarea>
+      <div style="margin-top:8px;">
+        <button onclick="copiarHTML()">Copiar HTML</button>
+        <button onclick="abrirEnNuevaVentana()">Abrir en nueva ventana (fallback)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Aranceles por trámite (valores unitarios)
+    const valoresArancel = {
+      "a la Anualidad Cultivares Inscriptos en el RNPC (A1)(3)": 189210,
+      "al Estudio de Diferenciacion (A2)": 235620,
+      "a la Inscripción de Cultivares en el Registro Nacional de la Propiedad de Cultivares (RNPC) (A2)(1) ": 471240,
+      "a la Solicitud de inscripción en RNC (A2)": 235620,
+      "a la Solicitud de inscripción en RNC y Estudio de Diferenciacion (A2)(2)": 471240
+    };
+
+    let variedades = [];
+
+    // Checkbox habilitado solo para Anualidad (buscamos la palabra 'Anualidad')
+    const tramiteSelect = document.getElementById("tramite");
+    const aplicarInteresesCheckbox = document.getElementById("aplicarIntereses");
+    function actualizarEstadoCheckbox() {
+      const esAnualidad = tramiteSelect.value && tramiteSelect.value.toLowerCase().includes("anualidad");
+      aplicarInteresesCheckbox.disabled = !esAnualidad;
+      if (!esAnualidad) aplicarInteresesCheckbox.checked = false;
+    }
+    tramiteSelect.addEventListener("change", actualizarEstadoCheckbox);
+    actualizarEstadoCheckbox();
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function agregarVariedad(numero = "", denominacion = "", especie = "") {
+      const index = Date.now() + Math.floor(Math.random() * 1000);
+      const contenedor = document.createElement("div");
+      contenedor.className = "variedad-item";
+      contenedor.id = `variedad_${index}`;
